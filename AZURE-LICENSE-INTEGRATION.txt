@@ -1,0 +1,20 @@
+FieldFlow, integração remota de licenciamento
+
+Este pacote já fica alinhado para Azure Functions:
+- Modo remoto por defeito
+- API Base: https://func-fieldflow-licensing-a7dkgyfsfmg9dvgt.westeurope-01.azurewebsites.net/api
+- Product ID: fieldflow
+- HMAC: timestamp.product.body
+
+Antes de instalar em produção:
+1. Definir o shared secret no plugin, idealmente via wp-config.php:
+   define('ROUTESPRO_LICENSE_API_SECRET', 'o-mesmo-secret-do-Azure');
+2. Confirmar que a Function App no Azure tem o mesmo ROUTESPRO_LICENSE_SHARED_SECRET.
+3. Testar ativação, validação e desativação no WordPress.
+
+Sugestão para wp-config.php:
+define('ROUTESPRO_LICENSE_API_BASE', 'https://func-fieldflow-licensing-a7dkgyfsfmg9dvgt.westeurope-01.azurewebsites.net/api');
+define('ROUTESPRO_LICENSE_API_SECRET', 'SEU_SECRET_AQUI');
+define('ROUTESPRO_LICENSE_PRODUCT_ID', 'fieldflow');
+define('ROUTESPRO_LICENSE_API_TIMEOUT', 15);
+define('ROUTESPRO_LICENSE_VALIDATE_INTERVAL', 12);

@@ -1,0 +1,134 @@
+/* FieldFlow PWA native prompt, premium floating layer. Zero layout footprint. */
+.ff-pwa-prompt,
+.ff-pwa-help,
+[data-ff-overlay] {
+    position: fixed !important;
+    z-index: 2147483000 !important;
+    box-sizing: border-box !important;
+    float: none !important;
+    clear: none !important;
+    margin: 0 !important;
+    max-height: calc(100dvh - 28px) !important;
+    overflow: auto !important;
+    contain: layout style paint !important;
+}
+.ff-pwa-prompt[hidden],
+.ff-pwa-help[hidden],
+[data-ff-overlay][hidden] {
+    display: none !important;
+}
+.ff-pwa-prompt {
+    right: 16px !important;
+    bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    left: auto !important;
+    width: min(390px, calc(100vw - 32px)) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 12px !important;
+    align-items: center !important;
+    padding: 14px 46px 14px 16px !important;
+    border: 1px solid rgba(255,255,255,.22) !important;
+    border-radius: 20px !important;
+    background: #111827 !important;
+    color: #ffffff !important;
+    box-shadow: 0 22px 60px rgba(0,0,0,.30) !important;
+    font-family: inherit !important;
+    line-height: 1.25 !important;
+}
+.ff-pwa-prompt-copy { min-width: 0 !important; }
+.ff-pwa-prompt-copy strong {
+    display: block !important;
+    margin: 0 0 3px !important;
+    color: inherit !important;
+    font-size: 14px !important;
+    font-weight: 850 !important;
+}
+.ff-pwa-prompt-copy span {
+    display: block !important;
+    color: rgba(255,255,255,.82) !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+}
+.ff-pwa-install {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 10px 14px !important;
+    border: 1px solid rgba(255,255,255,.30) !important;
+    border-radius: 999px !important;
+    background: rgba(255,255,255,.16) !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+}
+.ff-pwa-dismiss,
+.ff-pwa-help-close {
+    position: absolute !important;
+    top: 9px !important;
+    right: 9px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: rgba(255,255,255,.16) !important;
+    color: inherit !important;
+    cursor: pointer !important;
+    font-size: 20px !important;
+    line-height: 26px !important;
+    text-align: center !important;
+}
+.ff-pwa-help {
+    right: 16px !important;
+    bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+    left: auto !important;
+    width: min(360px, calc(100vw - 32px)) !important;
+    padding: 18px 18px 16px !important;
+    border-radius: 18px !important;
+    color: #111827 !important;
+    background: #ffffff !important;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28) !important;
+    border: 1px solid rgba(15,23,42,.12) !important;
+}
+.ff-pwa-help .ff-pwa-help-close { background: rgba(15,23,42,.08) !important; }
+.ff-pwa-help strong { display:block !important; margin:0 32px 8px 0 !important; font-size:16px !important; }
+.ff-pwa-help p { margin:0 !important; line-height:1.45 !important; color:#4b5563 !important; }
+.ff-pwa-help-device { margin-top:10px !important; padding-top:10px !important; border-top:1px solid rgba(15,23,42,.10) !important; font-weight:600 !important; }
+@media (max-width: 900px) {
+    body.fieldflow-has-app-mobile,
+    body.fieldflow-has-app-mobile #page,
+    body.fieldflow-has-app-mobile .site,
+    body.fieldflow-has-app-mobile .site-content,
+    body.fieldflow-has-app-mobile .content-area,
+    body.fieldflow-has-app-mobile main {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .ff-pwa-prompt,
+    .ff-pwa-help {
+        left: 14px !important;
+        right: 14px !important;
+        width: auto !important;
+        transform: none !important;
+    }
+    .ff-pwa-prompt {
+        grid-template-columns: minmax(0, 1fr) !important;
+        padding: 14px 46px 14px 14px !important;
+    }
+    .ff-pwa-install { width: 100% !important; }
+    .ff-pwa-help { bottom: calc(116px + env(safe-area-inset-bottom)) !important; }
+}
+@media (display-mode: standalone) {
+    .ff-pwa-prompt,
+    .ff-pwa-help { display: none !important; }
+}
