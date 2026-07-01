@@ -9,6 +9,9 @@ use RoutesPro\Services\MapsFactory;
 use RoutesPro\Services\Planning\RouteCalculator;
 use RoutesPro\Services\Planning\VisitRuleResolver;
 use RoutesPro\Services\Planning\PlanQualityScorer;
+use RoutesPro\Services\Planning\GeoPartitionService;
+use RoutesPro\Services\Planning\RouteCandidateSelector;
+use RoutesPro\Services\Planning\RoutePlanningPipeline;
 
 if (!defined('ABSPATH')) exit;
 
@@ -3041,6 +3044,22 @@ private static function build_period_plan(array $linked, string $scope, string $
     // Preserva chaves extra (ex: min_open_days) e garante defaults normalizados
     $options = array_merge($rawOptions, $norm);
 
+    // Delegate to the explicit geographic pipeline (Option A).
+    // Phase 1+2 (candidate selection + geo pre-partition) are handled by
+    // RoutePlanningPipeline before the internal scheduling methods are called.
+    return RoutePlanningPipeline::run($linked, $scope, $base_date, $holiday_country, $options);
+}
+
+/**
+ * Internal entry point called by RoutePlanningPipeline after Phase 1+2.
+ *
+ * Receives geo-annotated candidates (with cluster_id, corridor_key, etc.)
+ * and runs the scheduling phases (3-6): scoring, sequencing, guard rails,
+ * rebalancing.
+ *
+ * @internal Used by RoutePlanningPipeline only.
+ */
+public static function _run_pipeline_internal(array $linked, string $scope, string $base_date, string $holiday_country = 'pt', array $options = []): array {
     return $scope === 'monthly'
         ? self::build_month_plan($linked, $base_date, $holiday_country, $options)
         : self::build_week_plan($linked, $base_date, $holiday_country, $options);
@@ -3885,6 +3904,13 @@ $options['_debug_scope'] = 'weekly';
         $rb = $cb >= 4 ? 1 : ($cb === 1 ? 2 : ($cb === 2 ? 3 : 4));
         if ($ra !== $rb) return $ra <=> $rb;
         if ($ca !== $cb) return $cb <=> $ca;
+        // Pipeline Phase 2: use pre-computed geo_cluster_id to group candidates
+        // from the same cluster together within each cadence group.
+        // This ensures that P4 anchors from the same area are placed consecutively,
+        // and P1/P2/P3 visits from the same cluster follow their anchor.
+        $clA = (int)($a['geo_cluster_id'] ?? 0);
+        $clB = (int)($b['geo_cluster_id'] ?? 0);
+        if ($clA !== $clB && $clA > 0 && $clB > 0) return $clA <=> $clB;
         $za = self::task_zone_key((array)$a);
         $zb = self::task_zone_key((array)$b);
         if ($za !== $zb) return strcmp($za, $zb);
@@ -4373,28 +4399,34 @@ private static function plan_tasks_into_dates(array $tasks, array $dates, string
         $taskForCluster['_ff_geo_index'] = $idx;
     }
     unset($taskForCluster);
-    $geoClusterRadiusKm = self::default_geo_cluster_radius_km($tasks);
-    $geoClusters = self::build_geo_clusters($tasks, $geoClusterRadiusKm, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
-    $geoClusterByTaskIndex = [];
-    foreach ($geoClusters as $cluster) {
-        foreach ((array)($cluster['locations'] ?? []) as $clusterLocation) {
-            $idx = isset($clusterLocation['_ff_geo_index']) ? (int)$clusterLocation['_ff_geo_index'] : -1;
-            if ($idx >= 0) $geoClusterByTaskIndex[$idx] = $cluster;
+
+    // If candidates were already annotated by RouteCandidateSelector (Phase 2),
+    // skip the re-annotation to preserve the pre-computed geo metadata.
+    // This is the key hook that makes the pipeline's pre-partitioning effective.
+    if (empty($options['_geo_pre_annotated'])) {
+        $geoClusterRadiusKm = self::default_geo_cluster_radius_km($tasks);
+        $geoClusters = self::build_geo_clusters($tasks, $geoClusterRadiusKm, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
+        $geoClusterByTaskIndex = [];
+        foreach ($geoClusters as $cluster) {
+            foreach ((array)($cluster['locations'] ?? []) as $clusterLocation) {
+                $idx = isset($clusterLocation['_ff_geo_index']) ? (int)$clusterLocation['_ff_geo_index'] : -1;
+                if ($idx >= 0) $geoClusterByTaskIndex[$idx] = $cluster;
+            }
         }
-    }
-    foreach ($tasks as $idx => &$taskWithCluster) {
-        if (!empty($geoClusterByTaskIndex[$idx])) {
-            $cluster = (array)$geoClusterByTaskIndex[$idx];
-            $taskWithCluster['geo_cluster_id'] = (int)($cluster['cluster_id'] ?? 0);
-            $taskWithCluster['geo_cluster_density'] = (float)($cluster['density_score'] ?? 0);
-            $taskWithCluster['geo_cluster_dispersion'] = (float)($cluster['dispersion_score'] ?? 0);
-            $taskWithCluster['geo_cluster_access_km'] = (float)($cluster['distance_from_base'] ?? 0);
-            $taskWithCluster['geo_cluster_radius_km'] = (float)($cluster['radius_km'] ?? 0);
-            $taskWithCluster['route_corridor_key'] = self::task_route_corridor_key((array)$taskWithCluster, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
-            $taskWithCluster['route_corridor_position'] = self::task_route_corridor_position((array)$taskWithCluster, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
+        foreach ($tasks as $idx => &$taskWithCluster) {
+            if (!empty($geoClusterByTaskIndex[$idx])) {
+                $cluster = (array)$geoClusterByTaskIndex[$idx];
+                $taskWithCluster['geo_cluster_id'] = (int)($cluster['cluster_id'] ?? 0);
+                $taskWithCluster['geo_cluster_density'] = (float)($cluster['density_score'] ?? 0);
+                $taskWithCluster['geo_cluster_dispersion'] = (float)($cluster['dispersion_score'] ?? 0);
+                $taskWithCluster['geo_cluster_access_km'] = (float)($cluster['distance_from_base'] ?? 0);
+                $taskWithCluster['geo_cluster_radius_km'] = (float)($cluster['radius_km'] ?? 0);
+                $taskWithCluster['route_corridor_key'] = self::task_route_corridor_key((array)$taskWithCluster, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
+                $taskWithCluster['route_corridor_position'] = self::task_route_corridor_position((array)$taskWithCluster, (array)($options['start_point'] ?? []), (array)($options['end_point'] ?? []));
+            }
         }
+        unset($taskWithCluster);
     }
-    unset($taskWithCluster);
 
     $visitsPerStore = [];
     foreach ($tasks as $t) {
